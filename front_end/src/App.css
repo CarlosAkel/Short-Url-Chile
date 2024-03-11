@@ -1,0 +1,12 @@
+.app-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh; /* Optional: Set the height to 100% of the viewport height for vertical centering */
+}
+body {
+  margin: 0;
+  padding: 0;
+  background: url('../public/retro_test.png') no-repeat center center fixed; 
+  background-size: cover;
+}
