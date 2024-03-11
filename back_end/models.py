@@ -21,7 +21,7 @@ class User(Base):
         return check_password_hash(self.password, password)
     
     def json(self):
-        return {'id': self.id,'username': self.username, 'email': self.email}
+        return {'username': self.username}
         
 
 class Url(Base):
@@ -29,21 +29,25 @@ class Url(Base):
     id = Column(Integer, primary_key=True, index=True)
     url = Column(String, index=True) 
     user_id = Column(Integer, ForeignKey("users.id"))
+    short_url = Column(String, index=True)
 
 
     user = relationship("User", back_populates="urls", uselist=False) 
     
-    def __init__(self, url, user_id):
+    def __init__(self, url, user_id, short_url):
         self.url = url
         self.user_id = user_id
+        self.short_url = short_url
     
 
 class GuestUrl(Base):
     __tablename__ = "guest_urls"
     id = Column(Integer, primary_key=True, index=True)
-    url = Column(String, index=True) 
-    def __init__(self, url):
+    url = Column(String, index=True)
+    short_url = Column(String, index=True) 
+    def __init__(self, url, short_url):
         self.url = url
+        self.short_url = short_url
 
 
 Base.metadata.create_all(bind=engine)

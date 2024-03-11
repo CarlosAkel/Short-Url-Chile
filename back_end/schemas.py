@@ -18,6 +18,8 @@ class UserInDB(User):
 
 class Url(BaseModel):
     url: str
+    short_url: str
 
 class GuestUrl(BaseModel):
     url: str
+    short_url: str

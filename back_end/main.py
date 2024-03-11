@@ -1,30 +1,52 @@
 from fastapi import Depends, FastAPI, HTTPException, Request, Form, status, Security
 import models
 import os
+import requests
 from dotenv import load_dotenv
 from database import engine, SessionLocal
 from sqlalchemy.orm import Session
 from flask_jwt_extended import (create_access_token,get_jwt_identity,jwt_required,JWTManager)
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from typing import Annotated, Union
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from datetime import datetime, timedelta, timezone
 from schemas import *
-
+import random
+from authlib.integrations.starlette_client import OAuth, OAuthError
+from fastapi.templating import Jinja2Templates
+from starlette.middleware.sessions import SessionMiddleware
 load_dotenv()
 
 app = FastAPI()
+app.add_middleware(SessionMiddleware, secret_key="some-random-string")
 models.Base.metadata.create_all(bind=engine)
-# Define your OAuth2PasswordBearer instance
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token") # Auth With PasswordBearer
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
+characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
+GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI")
 
+oauth = OAuth()
+oauth.register(
+    name='google',
+    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+    client_id=GOOGLE_CLIENT_ID,
+    client_secret=GOOGLE_CLIENT_SECRET,
+    client_kwargs={
+        'scope': 'email openid profile',
+        'redirect_url': 'http://localhost:3000/google/auth'
+    }
+)
+
+
+templates = Jinja2Templates(directory="templates")
     
 
 def get_db():
@@ -69,8 +91,20 @@ async def get_current_active_user(
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
 
+def generate_string(length):
+    result = ''
+    characters_length = len(characters)
+    for i in range(length):
+        result += characters[random.randint(0, characters_length - 1)]
+    return result
 
+def create_short_url():
+    random_key = generate_string(5)
+    new_url = f"{random_key}" 
+    return new_url
 
+def get_current_host(request: Request):
+    return str(request.base_url)    
 
 @app.post('/user')
 async def create_user(request: Request, username: Annotated[str, Form()], email: Annotated[str, Form()],
@@ -124,29 +158,71 @@ async def login(request: Request, username: Annotated[str, Form()], email: Annot
     except Exception as error:
         return JSONResponse(content= f"Login error: {error}")
 
-
-
-
-
 @app.post('/url/guest')
 async def create_url(request: Request, url: Annotated[str, Form()], db: Session = Depends(get_db)):
-    db_url = models.GuestUrl(url=url)
+    short_url_key = create_short_url()
+    db_url = models.GuestUrl(url=url,short_url= short_url_key)
     db.add(db_url)
     db.commit()
     db.refresh(db_url)
-    json_data = jsonable_encoder(db_url)
+    json_data = jsonable_encoder({"short_url": f"{get_current_host(request)}{short_url_key}" })
     return JSONResponse(content= json_data)
 
 @app.post('/url/user')
 async def create_url_user(request: Request, url: Annotated[str, Form()],
                           current_user: str = Depends(get_current_user), db: Session = Depends(get_db)):
+    short_url_key = create_short_url()
     user = db.query(models.User).filter(models.User.username == current_user).first()
-    db_url = models.Url(url=url, user_id=user.id)
+    db_url = models.Url(url=url,short_url= short_url_key ,user_id=user.id)
     db.add(db_url)
     db.commit()
     db.refresh(db_url)
-    json_data = jsonable_encoder(db_url)
+    json_data = jsonable_encoder({"short_url": f"{get_current_host(request)}{short_url_key}" })
     return JSONResponse(content= json_data)
+
+@app.get('/{id}')
+async def create_url_user(id, db: Session = Depends(get_db)):
+    guest_url = db.query(models.GuestUrl).filter(models.GuestUrl.short_url == id).first()
+    if guest_url:
+        return RedirectResponse(url=guest_url.url, status_code=302)
+    else:
+        user_url = db.query(models.Url).filter(models.Url.short_url == id).first()
+        if user_url:
+            return RedirectResponse(url=user_url.url, status_code=302)
+        else:
+            raise HTTPException(status_code=404, detail="URL not found")
+
+
+
+
+@app.get("/google/login")
+async def login(request: Request):
+    url = request.url_for('auth')
+    return await oauth.google.authorize_redirect(request, url)
+
+
+@app.get('/google/auth')
+async def auth(request: Request):
+    try:
+        token = await oauth.google.authorize_access_token(request)
+    except OAuthError as e:
+        return templates.TemplateResponse(
+            name='error.html',
+            context={'request': request, 'error': e.error}
+        )
+    user = token.get('userinfo')
+    if user:
+        request.session['user'] = dict(user)
+    json_data = jsonable_encoder({"Login": f"Login DATA WIII" })
+    return JSONResponse(content= json_data)
+
+
+@app.get('/google/logout')
+def logout(request: Request):
+    request.session.pop('user')
+    request.session.clear()
+    return RedirectResponse('/')
+
 
 
 if __name__ == '__main__':
