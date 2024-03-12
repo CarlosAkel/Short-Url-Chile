@@ -15,23 +15,38 @@ from passlib.context import CryptContext
 from datetime import datetime, timedelta, timezone
 from schemas import *
 import random
+import secrets
 from authlib.integrations.starlette_client import OAuth, OAuthError
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
+from flask_cors import CORS
+from flask_cors import cross_origin
+from fastapi.middleware.cors import CORSMiddleware
 load_dotenv()
 
 app = FastAPI()
-app.add_middleware(SessionMiddleware, secret_key="some-random-string")
+SECRET_KEY = os.getenv("SECRET_KEY")
+app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY)
 models.Base.metadata.create_all(bind=engine)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token") # Auth With PasswordBearer
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 720
 characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI")
+
+origins = ["*"]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+#cors = CORS(app, resources={r"/*": {"origins": "*"}})
 
 oauth = OAuth()
 oauth.register(
@@ -41,7 +56,7 @@ oauth.register(
     client_secret=GOOGLE_CLIENT_SECRET,
     client_kwargs={
         'scope': 'email openid profile',
-        'redirect_url': 'http://localhost:3000/google/auth'
+        'redirect_url': 'http://localhost:8000/google/auth' # Remember to change
     }
 )
 
@@ -106,7 +121,8 @@ def create_short_url():
 def get_current_host(request: Request):
     return str(request.base_url)    
 
-@app.post('/user')
+
+@app.post('/user',tags=["CORS"])
 async def create_user(request: Request, username: Annotated[str, Form()], email: Annotated[str, Form()],
                       password: Annotated[str, Form()], db: Session = Depends(get_db)):
     try:
@@ -122,7 +138,7 @@ async def create_user(request: Request, username: Annotated[str, Form()], email:
     except Exception as error:
         return f"Error: {error}"
 
-@app.get('/users', response_model=dict)
+@app.get('/users', response_model=dict, tags=["CORS"])
 async def get_users(current_user: str = Depends(get_current_user), db: Session = Depends(get_db)):
     try:
         users = db.query(models.User).all()
@@ -132,7 +148,7 @@ async def get_users(current_user: str = Depends(get_current_user), db: Session =
         raise HTTPException(status_code=500, detail=f"Error: {error}")
     
 
-@app.post('/login', response_model=dict)
+@app.post('/login', response_model=dict, tags=["CORS"])
 async def login(request: Request, username: Annotated[str, Form()], email: Annotated[str, Form()], password: Annotated[str, Form()],
                  db: Session = Depends(get_db)):
     try:
@@ -158,8 +174,8 @@ async def login(request: Request, username: Annotated[str, Form()], email: Annot
     except Exception as error:
         return JSONResponse(content= f"Login error: {error}")
 
-@app.post('/url/guest')
-async def create_url(request: Request, url: Annotated[str, Form()], db: Session = Depends(get_db)):
+@app.post('/url/guest', tags=["CORS"])
+async def create_url_guest(request: Request, url: Annotated[str, Form()], db: Session = Depends(get_db)):
     short_url_key = create_short_url()
     db_url = models.GuestUrl(url=url,short_url= short_url_key)
     db.add(db_url)
@@ -168,7 +184,7 @@ async def create_url(request: Request, url: Annotated[str, Form()], db: Session 
     json_data = jsonable_encoder({"short_url": f"{get_current_host(request)}{short_url_key}" })
     return JSONResponse(content= json_data)
 
-@app.post('/url/user')
+@app.post('/url/user', tags=["CORS"])
 async def create_url_user(request: Request, url: Annotated[str, Form()],
                           current_user: str = Depends(get_current_user), db: Session = Depends(get_db)):
     short_url_key = create_short_url()
@@ -180,29 +196,54 @@ async def create_url_user(request: Request, url: Annotated[str, Form()],
     json_data = jsonable_encoder({"short_url": f"{get_current_host(request)}{short_url_key}" })
     return JSONResponse(content= json_data)
 
-@app.get('/{id}')
-async def create_url_user(id, db: Session = Depends(get_db)):
+@app.get('/url/user', tags=["CORS"])
+async def get_url(request: Request,current_user: str = Depends(get_current_user), db: Session = Depends(get_db)):
+    short_url_key = create_short_url()
+    user = db.query(models.User).filter(models.User.username == current_user).first()
+    urls = db.query(models.Url).filter(models.Url.user_id == user.id)
+    short_urls = [f"{get_current_host(request)}{url.short_url}" for url in urls]
+    
+    json_data = jsonable_encoder({"short_url": short_urls })
+    return JSONResponse(content= json_data)
+
+@app.get('/{id}', tags=["CORS"])
+async def get_url_redirect(id, db: Session = Depends(get_db)):
     guest_url = db.query(models.GuestUrl).filter(models.GuestUrl.short_url == id).first()
     if guest_url:
+        guest_url.clicks += 1
+        db.commit()
         return RedirectResponse(url=guest_url.url, status_code=302)
     else:
         user_url = db.query(models.Url).filter(models.Url.short_url == id).first()
         if user_url:
+            user_url.clicks += 1
+            db.commit()
             return RedirectResponse(url=user_url.url, status_code=302)
+        else:
+            raise HTTPException(status_code=404, detail="URL not found")
+
+@app.get('/clicks/{id}', tags=["CORS"])
+async def get_url_clicks(id, db: Session = Depends(get_db)):
+    guest_url = db.query(models.GuestUrl).filter(models.GuestUrl.short_url == id).first()
+    if guest_url:
+        return {"clicks": guest_url.clicks}
+    else:
+        user_url = db.query(models.Url).filter(models.Url.short_url == id).first()
+        if user_url:
+            return {"clicks": user_url.clicks}
         else:
             raise HTTPException(status_code=404, detail="URL not found")
 
 
 
-
-@app.get("/google/login")
-async def login(request: Request):
+@app.get("/google/login", tags=["CORS"])
+async def google_login(request: Request):
     url = request.url_for('auth')
     return await oauth.google.authorize_redirect(request, url)
 
 
-@app.get('/google/auth')
-async def auth(request: Request):
+@app.get('/google/auth', tags=["CORS"])
+async def auth(request: Request, db: Session = Depends(get_db)):
     try:
         token = await oauth.google.authorize_access_token(request)
     except OAuthError as e:
@@ -210,21 +251,35 @@ async def auth(request: Request):
             name='error.html',
             context={'request': request, 'error': e.error}
         )
-    user = token.get('userinfo')
-    if user:
-        request.session['user'] = dict(user)
-    json_data = jsonable_encoder({"Login": f"Login DATA WIII" })
-    return JSONResponse(content= json_data)
+    user_data = token.get('userinfo')
+    try:
+        user = db.query(models.User).filter(models.User.email == user_data.email).first()
+        user2 = db.query(models.User).filter(models.User.username == user_data.name).first()
+        json_data = jsonable_encoder(user_data)
+        if not user and not user2:
+            random_password = secrets.token_urlsafe(16)
+            new_user = models.User(username=user_data.name, email=user_data.email, password=random_password)
+            db.add(new_user)
+            db.commit()
+            db.refresh(new_user)
+            return {"Response": "Account created Succesfully"}
+        else:
+            access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+            access_token = create_access_token(
+            data={"sub": user_data.name}, expires_delta=access_token_expires
+            )
+            json_data = jsonable_encoder(Token(access_token=access_token, token_type="bearer"))
+            return JSONResponse(content= json_data)
+    except Exception as error:
+        return f"Error: {error}"
 
 
-@app.get('/google/logout')
-def logout(request: Request):
-    request.session.pop('user')
-    request.session.clear()
-    return RedirectResponse('/')
+# @app.get('/google/logout')
+# def logout(request: Request):
+#   return
 
 
 
 if __name__ == '__main__':
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=3000)
+    uvicorn.run(app, host="0.0.0.0", port=8000)

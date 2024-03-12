@@ -30,6 +30,7 @@ class Url(Base):
     url = Column(String, index=True) 
     user_id = Column(Integer, ForeignKey("users.id"))
     short_url = Column(String, index=True)
+    clicks = Column(Integer, index=True)
 
 
     user = relationship("User", back_populates="urls", uselist=False) 
@@ -38,16 +39,22 @@ class Url(Base):
         self.url = url
         self.user_id = user_id
         self.short_url = short_url
+        self.clicks = 0
     
+    def json(self):
+        return {'url': self.short_url}
 
 class GuestUrl(Base):
     __tablename__ = "guest_urls"
     id = Column(Integer, primary_key=True, index=True)
     url = Column(String, index=True)
-    short_url = Column(String, index=True) 
+    short_url = Column(String, index=True)
+    clicks = Column(Integer, index=True)
+    
     def __init__(self, url, short_url):
         self.url = url
         self.short_url = short_url
+        self.clicks = 0
 
 
 Base.metadata.create_all(bind=engine)

@@ -19,7 +19,9 @@ class UserInDB(User):
 class Url(BaseModel):
     url: str
     short_url: str
+    clicks: int
 
 class GuestUrl(BaseModel):
     url: str
     short_url: str
+    clicks: int
