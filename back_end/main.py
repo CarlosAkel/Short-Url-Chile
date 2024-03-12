@@ -1,15 +1,14 @@
-from fastapi import Depends, FastAPI, HTTPException, Request, Form, status, Security
+from fastapi import Depends, FastAPI, HTTPException, Request, Form
 import models
 import os
-import requests
 from dotenv import load_dotenv
 from database import engine, SessionLocal
 from sqlalchemy.orm import Session
-from flask_jwt_extended import (create_access_token,get_jwt_identity,jwt_required,JWTManager)
+from flask_jwt_extended import (create_access_token)
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, RedirectResponse
 from typing import Annotated, Union
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from datetime import datetime, timedelta, timezone
@@ -19,8 +18,6 @@ import secrets
 from authlib.integrations.starlette_client import OAuth, OAuthError
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
-from flask_cors import CORS
-from flask_cors import cross_origin
 from fastapi.middleware.cors import CORSMiddleware
 load_dotenv()
 
@@ -277,9 +274,3 @@ async def auth(request: Request, db: Session = Depends(get_db)):
 # @app.get('/google/logout')
 # def logout(request: Request):
 #   return
-
-
-
-if __name__ == '__main__':
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
