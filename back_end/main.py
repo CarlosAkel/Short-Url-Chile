@@ -46,16 +46,18 @@ app.add_middleware(
 #cors = CORS(app, resources={r"/*": {"origins": "*"}})
 
 oauth = OAuth()
-oauth.register(
-    name='google',
-    server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
-    client_id=GOOGLE_CLIENT_ID,
-    client_secret=GOOGLE_CLIENT_SECRET,
-    client_kwargs={
-        'scope': 'email openid profile',
-        'redirect_url': 'http://localhost:8000/google/auth' # Remember to change
-    }
-)
+def initialize_oauth(current_host):
+    redirect_uri = f'http://{current_host}/google/auth/callback'
+    oauth.register(
+        name='google',
+        server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
+        client_id=GOOGLE_CLIENT_ID,
+        client_secret=GOOGLE_CLIENT_SECRET,
+        client_kwargs={
+            'scope': 'email openid profile',
+            'redirect_uri': redirect_uri
+        }
+    )
 
 
 templates = Jinja2Templates(directory="templates")
@@ -235,6 +237,8 @@ async def get_url_clicks(id, db: Session = Depends(get_db)):
 
 @app.get("/google/login", tags=["CORS"])
 async def google_login(request: Request):
+    current_host = get_current_host(request)
+    initialize_oauth(current_host)
     url = request.url_for('auth')
     return await oauth.google.authorize_redirect(request, url)
 
@@ -274,3 +278,8 @@ async def auth(request: Request, db: Session = Depends(get_db)):
 # @app.get('/google/logout')
 # def logout(request: Request):
 #   return
+PORT = int(os.getenv("PORT"))
+
+if __name__ == '__main__':
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=PORT)

@@ -1,0 +1,13 @@
+{
+  "name": "short-url-chile",
+  "version": "1.0.0",
+  "description": "This is a simple Short Url WebApp",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "cd back_end && python main.py"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
