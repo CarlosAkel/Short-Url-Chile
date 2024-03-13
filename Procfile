@@ -1,2 +1,2 @@
 server: python back_end/main.py
-client: npm start --prefix front_end
+client: cd front_end && npm install && npm run build
