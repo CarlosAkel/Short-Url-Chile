@@ -1,2 +1,2 @@
-server: python main.py
-client: cd front_end && npm start
+server: python back_end/main.py
+client: npm start --prefix front_end
