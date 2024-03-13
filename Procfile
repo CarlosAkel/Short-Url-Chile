@@ -1,2 +1,2 @@
-web: python uvicorn main:app
-frontend: cd front_end && npm start
+server: python main.py
+client: cd front_end && npm start
