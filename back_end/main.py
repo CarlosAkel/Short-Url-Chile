@@ -277,7 +277,7 @@ async def auth(request: Request, db: Session = Depends(get_db)):
     except Exception as error:
         return f"Error: {error}"
 
-@app.get("/check-authentication-status", tags=["CORS"])
+@app.get("/check_status", tags=["CORS"])
 async def check_authentication_status(request: Request):
     access_token = request.cookies.get("access_token")
     if access_token:
