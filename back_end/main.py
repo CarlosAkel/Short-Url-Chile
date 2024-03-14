@@ -272,7 +272,7 @@ async def auth(request: Request, db: Session = Depends(get_db)):
             json_data = jsonable_encoder(Token(access_token=access_token, token_type="bearer"))
             response = JSONResponse(content=json_data)
             response.set_cookie(key="access_token", value=access_token)
-            return response
+            RedirectResponse(url="https://carlosakel.github.io/urls", status_code=302) #REVISAR AL CAMBIO
     except Exception as error:
         return f"Error: {error}"
 
