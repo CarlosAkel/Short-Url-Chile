@@ -148,30 +148,31 @@ async def get_users(current_user: str = Depends(get_current_user), db: Session =
     
 
 @app.post('/login', response_model=dict, tags=["CORS"])
-async def login(request: Request, username: Annotated[str, Form()], email: Annotated[str, Form()], password: Annotated[str, Form()],
+async def login(request: Request, username: str = Form(None), email: str = Form(None), password: str = Form(None),
                  db: Session = Depends(get_db)):
     try:
-        if (not username or not email) and not password :
-            return JSONResponse(content= f"Missing username or password")
+        if not (username or email) or not password:
+            return JSONResponse(content="Missing username or email or password")
 
-        user_email = db.query(models.User).filter(models.User.email == email).first()
-        user = user_email
-        user_username = db.query(models.User).filter(models.User.username == username).first()
-        if not user_email:
-            user = user_username
-        
+        user = None
+        if email:
+            user = db.query(models.User).filter(models.User.email == email).first()
+        elif username:
+            user = db.query(models.User).filter(models.User.username == username).first()
+
         if not user or not user.check_password(password):
-            return JSONResponse(content= f"Invalid username or password {user}  {user.check_password(password)}")
+            return JSONResponse(content="Invalid username or password")
 
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
+            data={"sub": user.username},
+            expires_delta=access_token_expires
         )
         json_data = jsonable_encoder(Token(access_token=access_token, token_type="bearer"))
-        return JSONResponse(content= json_data)
+        return JSONResponse(content=json_data)
          
     except Exception as error:
-        return JSONResponse(content= f"Login error: {error}")
+        return JSONResponse(content=f"Login error: {error}")
 
 @app.post('/url/guest', tags=["CORS"])
 async def create_url_guest(request: Request, url: Annotated[str, Form()], db: Session = Depends(get_db)):
