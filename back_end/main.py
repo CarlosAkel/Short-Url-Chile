@@ -249,10 +249,7 @@ async def auth(request: Request, db: Session = Depends(get_db)):
     try:
         token = await oauth.google.authorize_access_token(request)
     except OAuthError as e:
-        return templates.TemplateResponse(
-            name='error.html',
-            context={'request': request, 'error': e.error}
-        )
+        return {'request': request, 'error': e.error}
     user_data = token.get('userinfo')
     try:
         user = db.query(models.User).filter(models.User.email == user_data.email).first()
@@ -281,7 +278,7 @@ async def auth(request: Request, db: Session = Depends(get_db)):
             )
             json_data = {"Auth": True}
             response = JSONResponse(content=json_data)
-            response.set_cookie(key="access_token", value=access_token, domain="http://localhost:3000")
+            response.set_cookie(key="access_token", value=access_token)
             response.status_code = status.HTTP_303_SEE_OTHER
             return response
     except Exception as error:
