@@ -281,7 +281,7 @@ async def auth(request: Request, db: Session = Depends(get_db)):
             )
             json_data = {"Auth": True}
             response = JSONResponse(content=json_data)
-            response.set_cookie(key="access_token", value=access_token)
+            response.set_cookie(key="access_token", value=access_token, domain="http://localhost:3000")
             response.status_code = status.HTTP_303_SEE_OTHER
             return response
     except Exception as error:
