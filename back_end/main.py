@@ -269,21 +269,27 @@ async def auth(request: Request, db: Session = Depends(get_db)):
             access_token = create_access_token(
                 data={"sub": user_data.name}, expires_delta=access_token_expires
             )
-            json_data = jsonable_encoder(Token(access_token=access_token, token_type="bearer"))
+            #json_data = jsonable_encoder(Token(access_token=access_token, token_type="bearer"))
+            json_data = {"Auth": True}
             response = JSONResponse(content=json_data)
-            response.set_cookie(key="access_token", value="access_token")
-            #return response
-            return {"Set": True}
+            response.set_cookie(key="access_token", value=access_token)
+            return response
     except Exception as error:
         return f"Error: {error}"
 
-@app.get("/check_status", tags=["CORS"])
+@app.get("/google/check_status", tags=["CORS"])
 async def check_authentication_status(request: Request):
     access_token = request.cookies.get("access_token")
     if access_token:
         return {"authenticated": True}
     else:
         return {"authenticated": False}
+
+
+@app.get("/google/check_status", tags=["CORS"])
+async def set_cookie(request: Request):
+    response.set_cookie(key="access_token", value=access_token)
+    return {"Status": True}
 
 # @app.get('/google/logout')
 # def logout(request: Request):
