@@ -268,7 +268,7 @@ async def auth(request: Request, db: Session = Depends(get_db)):
             )
             json_data = {"Auth": True}
             response = JSONResponse(content=json_data)
-            response.set_cookie(key="access_token", value=access_token, domain="https://carlosakel.github.io/", secure=True, httponly=True, samesite='None')
+            response.set_cookie(key="access_token", value=access_token, domain="localhost")
             response.status_code = status.HTTP_303_SEE_OTHER
             return response
         else:
@@ -278,7 +278,7 @@ async def auth(request: Request, db: Session = Depends(get_db)):
             )
             json_data = {"Auth": True}
             response = JSONResponse(content=json_data)
-            response.set_cookie(key="access_token", value=access_token, domain="https://carlosakel.github.io/", secure=True, httponly=True, samesite='None')
+            response.set_cookie(key="access_token", value=access_token, domain="localhost")
             response.status_code = status.HTTP_303_SEE_OTHER
             return response
     except Exception as error:
