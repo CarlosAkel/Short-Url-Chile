@@ -132,7 +132,7 @@ async def create_user(request: Request, username: Annotated[str, Form()], email:
             db.add(new_user)
             db.commit()
             db.refresh(new_user)
-            return {"Response": {new_user.username}}
+            return {"Response": "OK"}
         return "User Already exist"
     except Exception as error:
         return f"Error: {error}"
