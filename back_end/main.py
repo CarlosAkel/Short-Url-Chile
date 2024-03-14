@@ -278,7 +278,7 @@ async def auth(request: Request, db: Session = Depends(get_db)):
             )
             json_data = {"Auth": True}
             response = JSONResponse(content=json_data)
-            redirect_url = f"https://short-url-chile.onrender.com?token={access_token}"
+            redirect_url = f"https://carlosakel.github.io/?token={access_token}"
             response = RedirectResponse(url=redirect_url)
             response.set_cookie(key="access_token", value=access_token)
             response.headers["access-control-allow-origin"] = "*"
