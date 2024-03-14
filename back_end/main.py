@@ -267,10 +267,12 @@ async def auth(request: Request, db: Session = Depends(get_db)):
         else:
             access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
             access_token = create_access_token(
-            data={"sub": user_data.name}, expires_delta=access_token_expires
+                data={"sub": user_data.name}, expires_delta=access_token_expires
             )
             json_data = jsonable_encoder(Token(access_token=access_token, token_type="bearer"))
-            return JSONResponse(content= json_data)
+            response = JSONResponse(content=json_data)
+            response.set_cookie(key="access_token", value=access_token)
+            return response
     except Exception as error:
         return f"Error: {error}"
 
