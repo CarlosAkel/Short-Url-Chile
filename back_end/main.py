@@ -263,7 +263,14 @@ async def auth(request: Request, db: Session = Depends(get_db)):
             db.add(new_user)
             db.commit()
             db.refresh(new_user)
-            response.headers["Location"] = "https://carlosakel.github.io/"
+            
+            access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+            access_token = create_access_token(
+                data={"sub": user_data.name}, expires_delta=access_token_expires
+            )
+            json_data = {"Auth": True}
+            response = JSONResponse(content=json_data)
+            response.set_cookie(key="access_token", value=access_token)
             response.status_code = status.HTTP_303_SEE_OTHER
             return response
         else:
@@ -273,9 +280,6 @@ async def auth(request: Request, db: Session = Depends(get_db)):
             )
             json_data = {"Auth": True}
             response = JSONResponse(content=json_data)
-            
-            # Redireccionar a la página principal
-            response.headers["Location"] = "https://carlosakel.github.io/"
             response.set_cookie(key="access_token", value=access_token)
             response.status_code = status.HTTP_303_SEE_OTHER
             return response
