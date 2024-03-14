@@ -256,7 +256,6 @@ async def auth(request: Request, db: Session = Depends(get_db)):
     try:
         user = db.query(models.User).filter(models.User.email == user_data.email).first()
         user2 = db.query(models.User).filter(models.User.username == user_data.name).first()
-        json_data = jsonable_encoder(user_data)
         if not user and not user2:
             random_password = secrets.token_urlsafe(16)
             new_user = models.User(username=user_data.name, email=user_data.email, password=random_password)
@@ -269,10 +268,9 @@ async def auth(request: Request, db: Session = Depends(get_db)):
             access_token = create_access_token(
                 data={"sub": user_data.name}, expires_delta=access_token_expires
             )
-            json_data = jsonable_encoder(Token(access_token=access_token, token_type="bearer"))
-            response = JSONResponse(content=json_data)
+            response = RedirectResponse(url="https://carlosakel.github.io/urls")  # Change "/logged" to your actual logged page URL
             response.set_cookie(key="access_token", value=access_token)
-            RedirectResponse(url="https://carlosakel.github.io/urls", status_code=302) #REVISAR AL CAMBIO
+            return response
     except Exception as error:
         return f"Error: {error}"
 
