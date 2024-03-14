@@ -1,4 +1,4 @@
-from fastapi import Depends, FastAPI, HTTPException, Request, Form
+from fastapi import Depends, FastAPI, HTTPException, Request, Form, status
 import models
 import os
 from dotenv import load_dotenv
@@ -263,16 +263,21 @@ async def auth(request: Request, db: Session = Depends(get_db)):
             db.add(new_user)
             db.commit()
             db.refresh(new_user)
-            return {"Response": "Account created Succesfully"}
+            response.headers["Location"] = "https://carlosakel.github.io/"
+            response.status_code = status.HTTP_303_SEE_OTHER
+            return response
         else:
             access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
             access_token = create_access_token(
                 data={"sub": user_data.name}, expires_delta=access_token_expires
             )
-            #json_data = jsonable_encoder(Token(access_token=access_token, token_type="bearer"))
             json_data = {"Auth": True}
             response = JSONResponse(content=json_data)
+            
+            # Redireccionar a la página principal
+            response.headers["Location"] = "https://carlosakel.github.io/"
             response.set_cookie(key="access_token", value=access_token)
+            response.status_code = status.HTTP_303_SEE_OTHER
             return response
     except Exception as error:
         return f"Error: {error}"
@@ -284,12 +289,6 @@ async def check_authentication_status(request: Request):
         return {"authenticated": True}
     else:
         return {"authenticated": False}
-
-
-@app.get("/google/check_status", tags=["CORS"])
-async def set_cookie(request: Request):
-    response.set_cookie(key="access_token", value=access_token)
-    return {"Status": True}
 
 # @app.get('/google/logout')
 # def logout(request: Request):
