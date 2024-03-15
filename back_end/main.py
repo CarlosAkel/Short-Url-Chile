@@ -302,44 +302,59 @@ async def check_authentication_status(request: Request):
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 
-FORGET_PWD_SECRET_KEY = os.getenv("FORGET_PWD_SECRET_KEY")
+EMAIL_SEND = os.getenv("EMAIL_SEND")
+EMAIL_SEND_PASSWORD = os.getenv("EMAIL_SEND_PASSWORD")
 
-def send_reset_link(username,email):
+
+def send_reset_link(username,email_user):
     
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": username}, expires_delta=access_token_expires
     )
-    message = Mail(
-        from_email="your_email@example.com",
-        to_emails=email,
-        subject="Password Reset Link",
-        html_content=f"<strong>Click this link to reset your password: </strong><a href='{PAGE_URL}/reset-password?token={access_token}'>Reset Password</a>"
-    )
-    try:
-        sg = SendGridAPIClient(FORGET_PWD_SECRET_KEY)
-        response = sg.send(message)
-        print(response.status_code)
-        print(response.body)
-        print(response.headers)
-    except Exception as e:
-        print("Error:", e)
+    
+     
+    message = MIMEMultipart()
+    message["To"] = email_user
+    message["From"] = 'Short-Url-Chile'
+    message["Subject"] = 'Reset Password'
+    messageText = MIMEText(f"<strong>Click this link to reset your password: </strong><a href='http://localhost:3000?token={access_token}&reset=true'>Reset Password</a>",'html')
+    message.attach(messageText)
 
-@app.post("/forgot-password")
-def forgot_password(email: str, db: Session = Depends(get_db)):
+    email = EMAIL_SEND
+    password = EMAIL_SEND_PASSWORD
+
+    server = smtplib.SMTP('smtp.gmail.com:587')
+    server.ehlo('Gmail')
+    server.starttls()
+    server.login(email,password)
+    fromaddr = EMAIL_SEND
+    toaddrs  = email_user
+    server.sendmail(fromaddr,toaddrs,message.as_string())
+    server.quit()
+        
+    
+    
+
+@app.post("/forgot-password", tags=["CORS"])
+async def forgot_password(email: Annotated[str, Form()], db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.email == email).first()
     if user:
         send_reset_link(user.username,email)
         return {"message": "Reset link sent to your email"}
+        
     else:
         raise HTTPException(status_code=404, detail="Email not found")
 
-@app.post("/reset-password")
-def reset_password(email: str, token: str, new_password: str, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(models.User.username == get_current_user(token)).first()
+@app.post("/reset-password", tags=["CORS"])
+async def reset_password(  new_password: Annotated[str, Form()],current_user: str = Depends(get_current_user), db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.username == current_user).first()
     if user:
-        user["password"] = new_password
+        user.password = new_password
         return {"message": "Password reset successfully"}
     else:
         raise HTTPException(status_code=404, detail="User not found")
