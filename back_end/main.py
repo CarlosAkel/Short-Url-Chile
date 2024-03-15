@@ -326,7 +326,7 @@ def send_reset_link(username,email):
     except Exception as e:
         print("Error:", e)
 
-@app.post("/forgot-password/")
+@app.post("/forgot-password")
 def forgot_password(email: str, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.email == email).first()
     if user:
@@ -335,7 +335,7 @@ def forgot_password(email: str, db: Session = Depends(get_db)):
     else:
         raise HTTPException(status_code=404, detail="Email not found")
 
-@app.post("/reset-password/")
+@app.post("/reset-password")
 def reset_password(email: str, token: str, new_password: str, db: Session = Depends(get_db)):
     user = db.query(models.User).filter(models.User.username == get_current_user(token)).first()
     if user:
