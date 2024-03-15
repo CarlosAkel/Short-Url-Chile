@@ -33,6 +33,7 @@ characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET")
 GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI")
+PAGE_URL = os.getenv("PAGE_URL")
 
 origins = ["*"]
 
@@ -278,7 +279,7 @@ async def auth(request: Request, db: Session = Depends(get_db)):
             )
             json_data = {"Auth": True}
             response = JSONResponse(content=json_data)
-            redirect_url = f"https://carlosakel.github.io/?token={access_token}"
+            redirect_url = f"{PAGE_URL}/?token={access_token}"
             response = RedirectResponse(url=redirect_url)
             response.set_cookie(key="access_token", value=access_token)
             response.headers["access-control-allow-origin"] = "*"
@@ -295,6 +296,53 @@ async def check_authentication_status(request: Request):
         return {"authenticated": True}
     else:
         return {"authenticated": False}
+
+# RESET
+
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
+
+
+FORGET_PWD_SECRET_KEY = os.getenv("FORGET_PWD_SECRET_KEY")
+
+def send_reset_link(username,email):
+    
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": username}, expires_delta=access_token_expires
+    )
+    message = Mail(
+        from_email="your_email@example.com",
+        to_emails=email,
+        subject="Password Reset Link",
+        html_content=f"<strong>Click this link to reset your password: </strong><a href='{PAGE_URL}/reset-password?token={access_token}'>Reset Password</a>"
+    )
+    try:
+        sg = SendGridAPIClient(FORGET_PWD_SECRET_KEY)
+        response = sg.send(message)
+        print(response.status_code)
+        print(response.body)
+        print(response.headers)
+    except Exception as e:
+        print("Error:", e)
+
+@app.post("/forgot-password/")
+def forgot_password(email: str, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email == email).first()
+    if user:
+        send_reset_link(user.username,email)
+        return {"message": "Reset link sent to your email"}
+    else:
+        raise HTTPException(status_code=404, detail="Email not found")
+
+@app.post("/reset-password/")
+def reset_password(email: str, token: str, new_password: str, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.username == get_current_user(token)).first()
+    if user:
+        user["password"] = new_password
+        return {"message": "Password reset successfully"}
+    else:
+        raise HTTPException(status_code=404, detail="User not found")
 
 # @app.get('/google/logout')
 # def logout(request: Request):
